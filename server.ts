@@ -26,7 +26,7 @@ async function startServer() {
   const storage = multer.memoryStorage();
   const upload = multer({ 
     storage: storage,
-    limits: { fileSize: 50 * 1024 * 1024 } // 50MB limit for STL files
+    limits: { fileSize: 50 * 1024 * 1024 } // 50MB limit for ZIP files
   });
 
   // API Route for form submission
@@ -65,8 +65,8 @@ async function startServer() {
         from: `"${name}" <${process.env.SMTP_USER}>`,
         to: targetEmail,
         replyTo: email,
-        subject: `Neue STL-Anfrage von ${name}`,
-        text: `Name: ${name}\nEmail: ${email}\n\nEs wurde eine neue STL-Datei hochgeladen.`,
+        subject: `Neue ZIP-Anfrage von ${name}`,
+        text: `Name: ${name}\nEmail: ${email}\n\nEs wurde eine neue ZIP-Datei hochgeladen.`,
         attachments: []
       };
 

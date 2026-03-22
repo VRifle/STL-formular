@@ -20,11 +20,11 @@ export default function App() {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const selectedFile = e.target.files[0];
-      if (selectedFile.name.toLowerCase().endsWith('.stl')) {
+      if (selectedFile.name.toLowerCase().endsWith('.zip')) {
         setFile(selectedFile);
         setErrorMessage('');
       } else {
-        setErrorMessage('Bitte laden Sie nur .stl Dateien hoch.');
+        setErrorMessage('Bitte laden Sie nur .zip Dateien hoch.');
         setFile(null);
       }
     }
@@ -43,7 +43,7 @@ export default function App() {
     }
 
     if (!file) {
-      setErrorMessage('Bitte wählen Sie eine STL-Datei aus.');
+      setErrorMessage('Bitte wählen Sie eine ZIP-Datei aus.');
       return;
     }
 
@@ -107,7 +107,7 @@ export default function App() {
                 <div className="w-16 h-16 bg-emerald-50 text-emerald-500 rounded-full flex items-center justify-center mb-6">
                   <CheckCircle2 size={32} />
                 </div>
-                <h2 className="text-2xl font-medium mb-2">STL gesendet!</h2>
+                <h2 className="text-2xl font-medium mb-2">ZIP gesendet!</h2>
                 <p className="text-muted-foreground mb-8">Vielen Dank für Ihren Upload. Wir melden uns in Kürze bei Ihnen.</p>
                 <button 
                   onClick={() => setStatus('idle')}
@@ -160,7 +160,7 @@ export default function App() {
 
                 <div className="space-y-2">
                   <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                    STL Datei <span className="text-red-500">*</span>
+                    ZIP Datei <span className="text-red-500">*</span>
                   </label>
                   <div 
                     onClick={() => fileInputRef.current?.click()}
@@ -170,7 +170,7 @@ export default function App() {
                       type="file" 
                       ref={fileInputRef}
                       onChange={handleFileChange}
-                      accept=".stl"
+                      accept=".zip"
                       className="hidden"
                     />
                     
@@ -198,7 +198,7 @@ export default function App() {
                         </div>
                         <div className="text-center">
                           <p className="text-sm font-medium">Datei auswählen oder hierher ziehen</p>
-                          <p className="text-xs text-muted-foreground mt-1">Nur .stl Dateien bis 50MB</p>
+                          <p className="text-xs text-muted-foreground mt-1">Nur .zip Dateien bis 50MB</p>
                         </div>
                       </>
                     )}
@@ -226,7 +226,7 @@ export default function App() {
                   ) : (
                     <>
                       <Printer size={18} />
-                      <span>STL senden</span>
+                      <span>ZIP senden</span>
                     </>
                   )}
                 </button>
