@@ -58,6 +58,7 @@ export default function App() {
     }
 
     try {
+      console.log('Sende Daten an:', `${window.location.origin}/api/contact`);
       const response = await fetch('/api/contact', {
         method: 'POST',
         body: data,
@@ -67,15 +68,17 @@ export default function App() {
 
       if (response.ok) {
         setStatus('success');
-        setFormData({ name: '', email: '', message: '' });
+        setFormData({ name: '', email: '' });
         setFile(null);
       } else {
         setStatus('error');
-        setErrorMessage(result.error || 'Etwas ist schief gelaufen.');
+        setErrorMessage(result.error || `Server-Fehler: ${response.status}`);
       }
     } catch (error) {
+      console.error('Fetch error:', error);
       setStatus('error');
-      setErrorMessage('Verbindung zum Server fehlgeschlagen.');
+      const msg = error instanceof Error ? error.message : 'Unbekannter Netzwerkfehler';
+      setErrorMessage(`Verbindung zum Server fehlgeschlagen: ${msg}. Bitte prüfen Sie Ihre Internetverbindung oder verkleinern Sie die Datei.`);
     }
   };
 

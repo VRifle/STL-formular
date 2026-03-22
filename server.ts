@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import express from 'express';
 import multer from 'multer';
 import nodemailer from 'nodemailer';
@@ -15,6 +16,11 @@ async function startServer() {
 
   app.use(cors());
   app.use(express.json());
+
+  // Health check endpoint
+  app.get('/api/health', (req, res) => {
+    res.json({ status: 'ok', environment: process.env.NODE_ENV });
+  });
 
   // Configure Multer for file uploads
   const storage = multer.memoryStorage();
