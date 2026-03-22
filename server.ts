@@ -36,7 +36,11 @@ async function startServer() {
   });
 
   // API Route for form submission
-  app.post('/api/contact', upload.single('file'), async (req, res) => {
+  app.post('/api/upload-zip', (req, res, next) => {
+    console.log('POST /api/upload-zip reached');
+    next();
+  }, upload.single('file'), async (req, res) => {
+    console.log('Multer finished, processing request body:', req.body);
     const { name, email } = req.body;
     const file = req.file;
 
@@ -95,6 +99,12 @@ async function startServer() {
       });
       res.status(500).json({ error: `Fehler beim Senden: ${error.message || 'Bitte versuchen Sie es später erneut.'}` });
     }
+  });
+
+  // 404 for any other /api routes
+  app.all('/api/*', (req, res) => {
+    console.log(`404 on API route: ${req.method} ${req.url}`);
+    res.status(404).json({ error: `API-Endpunkt ${req.method} ${req.url} nicht gefunden.` });
   });
 
   // Vite middleware for development

@@ -58,8 +58,8 @@ export default function App() {
     }
 
     try {
-      console.log('Sende Daten an:', `${window.location.origin}/api/contact`);
-      const response = await fetch('/api/contact', {
+      console.log('Sende Daten an:', `${window.location.origin}/api/upload-zip`);
+      const response = await fetch('/api/upload-zip', {
         method: 'POST',
         body: data,
       });
