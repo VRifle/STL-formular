@@ -64,7 +64,18 @@ export default function App() {
         body: data,
       });
 
-      const result = await response.json();
+      // Prüfen, ob die Antwort JSON ist
+      const contentType = response.headers.get("content-type");
+      let result;
+      
+      if (contentType && contentType.includes("application/json")) {
+        result = await response.json();
+      } else {
+        // Falls kein JSON (z.B. Cloudflare Fehlerseite), Text auslesen
+        const errorText = await response.text();
+        console.error('Server antwortete mit nicht-JSON:', errorText);
+        throw new Error(`Server-Antwort ist kein JSON (Status: ${response.status}). Wahrscheinlich wurde die Verbindung von Cloudflare oder dem Server unterbrochen.`);
+      }
 
       if (response.ok) {
         setStatus('success');
@@ -75,10 +86,10 @@ export default function App() {
         setErrorMessage(result.error || `Server-Fehler: ${response.status}`);
       }
     } catch (error) {
-      console.error('Fetch error:', error);
+      console.error('Detaillierter Fehler:', error);
       setStatus('error');
       const msg = error instanceof Error ? error.message : 'Unbekannter Netzwerkfehler';
-      setErrorMessage(`Verbindung zum Server fehlgeschlagen: ${msg}. Bitte prüfen Sie Ihre Internetverbindung oder verkleinern Sie die Datei.`);
+      setErrorMessage(`Fehler: ${msg}`);
     }
   };
 
