@@ -62,10 +62,10 @@ async function startServer() {
   // API Route for form submission
   app.post('/api/v1/upload', upload.single('file'), async (req, res) => {
     console.log('POST /api/v1/upload reached');
-    const { name, email } = req.body;
+    const { name } = req.body;
     const file = req.file;
 
-    if (!name || !email || !file) {
+    if (!name || !file) {
       return res.status(400).json({ error: 'Bitte füllen Sie alle Pflichtfelder aus und laden Sie eine Datei hoch.' });
     }
 

@@ -5,7 +5,6 @@ import { motion, AnimatePresence } from 'motion/react';
 export default function App() {
   const [formData, setFormData] = useState({
     name: '',
-    email: '',
   });
   const [file, setFile] = useState<File | null>(null);
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
@@ -15,34 +14,6 @@ export default function App() {
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
-  };
-
-  const [testStatus, setTestStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
-
-  const handleTestConnection = async () => {
-    setTestStatus('loading');
-    try {
-      const response = await fetch('/api/v1/test', { method: 'POST' });
-      if (response.ok) {
-        setTestStatus('success');
-        setTimeout(() => setTestStatus('idle'), 3000);
-      } else {
-        const contentType = response.headers.get("content-type");
-        let errorMsg = 'Test fehlgeschlagen';
-        if (contentType && contentType.includes("application/json")) {
-          const err = await response.json();
-          errorMsg = err.error || errorMsg;
-        } else {
-          errorMsg = `Status ${response.status}: Die Anfrage wurde vom Proxy/Cloudflare blockiert.`;
-        }
-        throw new Error(errorMsg);
-      }
-    } catch (error) {
-      console.error('Test error:', error);
-      setTestStatus('error');
-      alert(`E-Mail Test fehlgeschlagen: ${error instanceof Error ? error.message : 'Unbekannter Fehler'}`);
-      setTimeout(() => setTestStatus('idle'), 5000);
-    }
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -65,7 +36,7 @@ export default function App() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name || !formData.email) {
+    if (!formData.name) {
       setErrorMessage('Bitte füllen Sie alle Pflichtfelder aus.');
       return;
     }
@@ -80,7 +51,6 @@ export default function App() {
 
     const data = new FormData();
     data.append('name', formData.name);
-    data.append('email', formData.email);
     if (file) {
       data.append('file', file);
     }
@@ -111,7 +81,7 @@ export default function App() {
 
       if (response.ok) {
         setStatus('success');
-        setFormData({ name: '', email: '' });
+        setFormData({ name: '' });
         setFile(null);
       } else {
         setStatus('error');
@@ -133,18 +103,9 @@ export default function App() {
         className="w-full max-w-xl bg-white rounded-3xl shadow-sm border border-black/5 overflow-hidden"
       >
         <div className="p-8 md:p-12">
-          <header className="mb-10 flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-semibold tracking-tight mb-2">Design-Upload</h1>
-              <p className="text-muted-foreground text-sm">Lade deine soeben gespeicherte Datei hier hoch</p>
-            </div>
-            <button 
-              onClick={handleTestConnection}
-              disabled={testStatus === 'loading'}
-              className="text-[10px] uppercase tracking-widest text-muted-foreground hover:text-black transition-colors border border-black/5 px-2 py-1 rounded h-fit"
-            >
-              {testStatus === 'loading' ? 'Teste...' : testStatus === 'success' ? 'E-Mail OK!' : testStatus === 'error' ? 'E-Mail Fehler' : 'Verbindung testen'}
-            </button>
+          <header className="mb-10">
+            <h1 className="text-3xl font-semibold tracking-tight mb-2">Design-Upload</h1>
+            <p className="text-muted-foreground text-sm">Lade deine soeben gespeicherte Datei hier hoch</p>
           </header>
 
           <AnimatePresence mode="wait">
@@ -160,7 +121,7 @@ export default function App() {
                   <CheckCircle2 size={32} />
                 </div>
                 <h2 className="text-2xl font-medium mb-2">Upload erfolgreich!</h2>
-                <p className="text-muted-foreground mb-8">Ihre Datei wurde sicher in Dropbox gespeichert. Wir haben eine Benachrichtigung erhalten.</p>
+                <p className="text-muted-foreground mb-8">Ihre Datei wurde sicher in Dropbox gespeichert.</p>
                 <button 
                   onClick={() => setStatus('idle')}
                   className="px-6 py-2 bg-black text-white rounded-full text-sm font-medium hover:bg-black/80 transition-colors"
@@ -177,7 +138,7 @@ export default function App() {
                 onSubmit={handleSubmit} 
                 className="space-y-6"
               >
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-6">
                   <div className="space-y-2">
                     <label htmlFor="name" className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
                       Name <span className="text-red-500">*</span>
@@ -191,21 +152,6 @@ export default function App() {
                       onChange={handleInputChange}
                       className="w-full px-4 py-3 rounded-xl bg-[#f9f9f9] border border-transparent focus:bg-white focus:border-black/10 transition-all outline-none text-sm"
                       placeholder="Ihr Name"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label htmlFor="email" className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                      Email <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="email"
-                      id="email"
-                      name="email"
-                      required
-                      value={formData.email}
-                      onChange={handleInputChange}
-                      className="w-full px-4 py-3 rounded-xl bg-[#f9f9f9] border border-transparent focus:bg-white focus:border-black/10 transition-all outline-none text-sm"
-                      placeholder="ihre@email.de"
                     />
                   </div>
                 </div>
