@@ -1,7 +1,6 @@
 import 'dotenv/config';
 import express from 'express';
 import multer from 'multer';
-import nodemailer from 'nodemailer';
 import cors from 'cors';
 import path from 'path';
 import { createServer as createViteServer } from 'vite';
@@ -56,48 +55,8 @@ async function startServer() {
     res.send('Server is alive and reaching debug-root');
   });
 
-  app.get('/api/v1/test', (req, res) => {
-    res.json({ message: 'API Test-Endpunkt ist bereit. Bitte nutzen Sie POST für den E-Mail-Test.', method: req.method });
-  });
-
   app.get('/api/v1/upload', (req, res) => {
     res.json({ message: 'API Upload-Endpunkt ist bereit. Bitte nutzen Sie POST für Datei-Uploads.', method: req.method });
-  });
-
-  // Test email connection endpoint
-  app.post('/api/v1/test', async (req, res) => {
-    console.log('POST /api/v1/test reached');
-    if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
-      return res.status(500).json({ error: 'SMTP-Zugangsdaten fehlen.' });
-    }
-
-    try {
-      const transporter = nodemailer.createTransport({
-        host: process.env.SMTP_HOST || 'smtp.gmail.com',
-        port: parseInt(process.env.SMTP_PORT || '587'),
-        secure: process.env.SMTP_PORT === '465',
-        auth: {
-          user: process.env.SMTP_USER,
-          pass: process.env.SMTP_PASS,
-        },
-      });
-
-      await transporter.verify();
-      console.log('SMTP Connection verified successfully!');
-      
-      const targetEmail = process.env.TARGET_EMAIL || 'sk.vrifle@gmail.com';
-      await transporter.sendMail({
-        from: `"${process.env.SMTP_USER}" <${process.env.SMTP_USER}>`,
-        to: targetEmail,
-        subject: 'Test-E-Mail von Ihrer App',
-        text: 'Die E-Mail-Verbindung funktioniert einwandfrei!'
-      });
-
-      res.status(200).json({ success: true });
-    } catch (error: any) {
-      console.error('SMTP Verification failed:', error);
-      res.status(500).json({ error: error.message });
-    }
   });
 
   // API Route for form submission
@@ -132,35 +91,6 @@ async function startServer() {
       });
       
       console.log('Dropbox upload successful:', uploadResponse.result.path_display);
-
-      // Send email notification
-      if (process.env.SMTP_USER && process.env.SMTP_PASS) {
-        console.log(`Sending notification email to ${process.env.TARGET_EMAIL || 'sk.vrifle@gmail.com'}`);
-        
-        const transporter = nodemailer.createTransport({
-          host: process.env.SMTP_HOST || 'smtp.gmail.com',
-          port: parseInt(process.env.SMTP_PORT || '587'),
-          secure: process.env.SMTP_PORT === '465',
-          auth: {
-            user: process.env.SMTP_USER,
-            pass: process.env.SMTP_PASS,
-          },
-        });
-
-        const targetEmail = process.env.TARGET_EMAIL || 'sk.vrifle@gmail.com';
-
-        await transporter.sendMail({
-          from: `"${name}" <${process.env.SMTP_USER}>`,
-          to: targetEmail,
-          replyTo: email,
-          subject: `Neuer Dropbox-Upload von ${name}`,
-          text: `Name: ${name}\nEmail: ${email}\n\nEs wurde eine neue Datei in Dropbox hochgeladen:\nPfad: ${uploadResponse.result.path_display}\nGröße: ${(file.size / 1024 / 1024).toFixed(2)} MB`,
-        });
-        
-        console.log('Notification email sent successfully!');
-      } else {
-        console.warn('SMTP credentials missing, skipping notification email.');
-      }
 
       res.status(200).json({ success: 'Datei erfolgreich in Dropbox hochgeladen!' });
     } catch (error: any) {
