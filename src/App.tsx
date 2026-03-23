@@ -17,6 +17,34 @@ export default function App() {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  const [testStatus, setTestStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+
+  const handleTestConnection = async () => {
+    setTestStatus('loading');
+    try {
+      const response = await fetch('/api/v1/test', { method: 'POST' });
+      if (response.ok) {
+        setTestStatus('success');
+        setTimeout(() => setTestStatus('idle'), 3000);
+      } else {
+        const contentType = response.headers.get("content-type");
+        let errorMsg = 'Test fehlgeschlagen';
+        if (contentType && contentType.includes("application/json")) {
+          const err = await response.json();
+          errorMsg = err.error || errorMsg;
+        } else {
+          errorMsg = `Status ${response.status}: Die Anfrage wurde vom Proxy/Cloudflare blockiert.`;
+        }
+        throw new Error(errorMsg);
+      }
+    } catch (error) {
+      console.error('Test error:', error);
+      setTestStatus('error');
+      alert(`E-Mail Test fehlgeschlagen: ${error instanceof Error ? error.message : 'Unbekannter Fehler'}`);
+      setTimeout(() => setTestStatus('idle'), 5000);
+    }
+  };
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const selectedFile = e.target.files[0];
@@ -58,8 +86,8 @@ export default function App() {
     }
 
     try {
-      console.log('Sende Daten an:', `${window.location.origin}/api/upload-zip`);
-      const response = await fetch('/api/upload-zip', {
+      console.log('Sende Daten an:', `${window.location.origin}/api/v1/upload`);
+      const response = await fetch('/api/v1/upload', {
         method: 'POST',
         body: data,
       });
@@ -71,9 +99,13 @@ export default function App() {
       if (contentType && contentType.includes("application/json")) {
         result = await response.json();
       } else {
-        // Falls kein JSON (z.B. Cloudflare Fehlerseite), Text auslesen
         const errorText = await response.text();
         console.error('Server antwortete mit nicht-JSON:', errorText);
+        
+        if (response.status === 405) {
+          throw new Error('Fehler 405: Die Anfrage wurde blockiert. Dies passiert oft durch Cloudflare-Sicherheitsregeln oder falsche Weiterleitungen. Bitte prüfen Sie Ihre Cloudflare WAF-Einstellungen.');
+        }
+        
         throw new Error(`Server-Antwort ist kein JSON (Status: ${response.status}). Wahrscheinlich wurde die Verbindung von Cloudflare oder dem Server unterbrochen.`);
       }
 
@@ -101,9 +133,18 @@ export default function App() {
         className="w-full max-w-xl bg-white rounded-3xl shadow-sm border border-black/5 overflow-hidden"
       >
         <div className="p-8 md:p-12">
-          <header className="mb-10">
-            <h1 className="text-3xl font-semibold tracking-tight mb-2">Design-Upload</h1>
-            <p className="text-muted-foreground text-sm">Lade deine soeben gespeicherte Datei hier hoch</p>
+          <header className="mb-10 flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-semibold tracking-tight mb-2">Design-Upload</h1>
+              <p className="text-muted-foreground text-sm">Lade deine soeben gespeicherte Datei hier hoch</p>
+            </div>
+            <button 
+              onClick={handleTestConnection}
+              disabled={testStatus === 'loading'}
+              className="text-[10px] uppercase tracking-widest text-muted-foreground hover:text-black transition-colors border border-black/5 px-2 py-1 rounded h-fit"
+            >
+              {testStatus === 'loading' ? 'Teste...' : testStatus === 'success' ? 'E-Mail OK!' : testStatus === 'error' ? 'E-Mail Fehler' : 'Verbindung testen'}
+            </button>
           </header>
 
           <AnimatePresence mode="wait">
@@ -118,8 +159,8 @@ export default function App() {
                 <div className="w-16 h-16 bg-emerald-50 text-emerald-500 rounded-full flex items-center justify-center mb-6">
                   <CheckCircle2 size={32} />
                 </div>
-                <h2 className="text-2xl font-medium mb-2">ZIP gesendet!</h2>
-                <p className="text-muted-foreground mb-8">Vielen Dank für Ihren Upload. Wir melden uns in Kürze bei Ihnen.</p>
+                <h2 className="text-2xl font-medium mb-2">Upload erfolgreich!</h2>
+                <p className="text-muted-foreground mb-8">Ihre Datei wurde sicher in Dropbox gespeichert. Wir haben eine Benachrichtigung erhalten.</p>
                 <button 
                   onClick={() => setStatus('idle')}
                   className="px-6 py-2 bg-black text-white rounded-full text-sm font-medium hover:bg-black/80 transition-colors"
