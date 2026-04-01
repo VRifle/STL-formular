@@ -16,6 +16,7 @@ export default function App() {
   const [userName, setUserName] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'completed' | 'error'>('idle');
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -42,6 +43,7 @@ export default function App() {
 
     setSelectedFile(file);
     setUploadStatus('idle');
+    setErrorMessage(null);
     setProgress(0);
   };
 
@@ -53,6 +55,7 @@ export default function App() {
     }
 
     setUploadStatus('uploading');
+    setErrorMessage(null);
     setProgress(0);
 
     const formData = new FormData();
@@ -79,7 +82,8 @@ export default function App() {
       clearInterval(progressInterval);
 
       if (!response.ok) {
-        throw new Error('Upload fehlgeschlagen');
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Upload fehlgeschlagen');
       }
 
       const result = await response.json();
@@ -102,6 +106,7 @@ export default function App() {
     } catch (error) {
       console.error('Upload error:', error);
       setUploadStatus('error');
+      setErrorMessage(error instanceof Error ? error.message : 'Ein unbekannter Fehler ist aufgetreten');
     }
   };
 
@@ -229,8 +234,9 @@ export default function App() {
                 )}
 
                 {uploadStatus === 'error' && (
-                  <p className="text-red-500 text-sm text-center mt-4 flex items-center justify-center gap-2">
-                    <AlertCircle className="w-4 h-4" /> Fehler beim Senden. Bitte erneut versuchen.
+                  <p className="text-red-500 text-sm text-center mt-4 flex flex-col items-center justify-center gap-2">
+                    <span className="flex items-center gap-2"><AlertCircle className="w-4 h-4" /> Fehler beim Senden</span>
+                    <span className="text-xs opacity-70">{errorMessage}</span>
                   </p>
                 )}
               </motion.div>

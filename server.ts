@@ -20,6 +20,7 @@ const getResend = () => {
 
 // Initialize SQLite database
 const db = new Database("designs.db");
+console.log("SQLite database initialized at designs.db");
 db.exec(`
   CREATE TABLE IF NOT EXISTS designs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -35,12 +36,13 @@ db.exec(`
 const uploadDir = path.join(process.cwd(), "uploads");
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir);
+  console.log("Created uploads directory");
 }
 
 // Configure multer for storage
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, "uploads/");
+    cb(null, uploadDir);
   },
   filename: (req, file, cb) => {
     const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
@@ -75,71 +77,83 @@ async function startServer() {
   app.use(express.json());
 
   // API Routes
-  app.post("/api/upload", upload.single("file"), async (req, res) => {
-    if (!req.file) {
-      return res.status(400).json({ error: "No file uploaded" });
-    }
-
-    const { filename, originalname, path: filePath, size } = req.file;
-    const userName = req.body.userName || "Unbekannter Nutzer";
-    const createdAt = new Date().toISOString();
-    console.log(`File uploaded by ${userName}:`, filename);
-
-    // Store metadata in SQLite
+  app.get("/api/health", (req, res) => {
     try {
-      const stmt = db.prepare("INSERT INTO designs (userName, filename, originalName, size, createdAt) VALUES (?, ?, ?, ?, ?)");
-      stmt.run(userName, filename, originalname, size, createdAt);
-      console.log("Metadata stored in SQLite");
-    } catch (dbError) {
-      console.error("Failed to store metadata in SQLite:", dbError);
+      const row = db.prepare("SELECT 1 as ok").get();
+      const testFile = path.join(uploadDir, ".test-write");
+      fs.writeFileSync(testFile, "ok");
+      fs.unlinkSync(testFile);
+      res.json({ status: "ok", db: row ? "connected" : "error", fs: "writable" });
+    } catch (err) {
+      res.status(500).json({ status: "error", message: err instanceof Error ? err.message : String(err) });
     }
+  });
 
-    // Send Email via Resend (API) - Works on Cloudflare
-    const resendClient = getResend();
-    if (resendClient) {
-      try {
-        await resendClient.emails.send({
-          from: "Vasen Design <onboarding@resend.dev>", // Replace with your domain later
-          to: "sk.vrifle@gmail.com",
-          subject: `Neues Vasen-Design von ${userName}: ${originalname}`,
-          text: `Ein neues Vasen-Design wurde hochgeladen.\n\nAbsender: ${userName}\nDateiname: ${originalname}\nGröße: ${(size / 1024 / 1024).toFixed(2)} MB`,
-          // Note: Resend attachments need a special format, for now we send the text notification
-        });
-        console.log(`Resend API email sent for ${userName}`);
-      } catch (resendError) {
-        console.error("Resend API failed:", resendError);
+  app.post("/api/upload", upload.single("file"), async (req, res) => {
+    try {
+      if (!req.file) {
+        console.error("Upload attempt without file");
+        return res.status(400).json({ error: "No file uploaded" });
       }
-    }
 
-    // Fallback: Send Email via Nodemailer (SMTP)
-    const transporter = getTransporter();
-    if (transporter) {
+      const { filename, originalname, path: filePath, size } = req.file;
+      const userName = req.body.userName || "Unbekannter Nutzer";
+      const createdAt = new Date().toISOString();
+      console.log(`Processing upload: ${originalname} from ${userName}`);
+
+      // Store metadata in SQLite
       try {
-        await transporter.sendMail({
-          from: `"Design Upload" <${process.env.GMAIL_USER}>`,
-          to: "sk.vrifle@gmail.com",
-          subject: `Neues Vasen-Design von ${userName}: ${originalname}`,
-          text: `Ein neues Vasen-Design wurde hochgeladen.\n\nAbsender: ${userName}\nDateiname: ${originalname}\nGröße: ${(size / 1024 / 1024).toFixed(2)} MB`,
-          attachments: [
-            {
-              filename: originalname,
-              path: filePath,
-            },
-          ],
-        });
-        console.log(`Email sent successfully to sk.vrifle@gmail.com for ${userName}`);
-      } catch (error) {
-        console.error("Failed to send email:", error);
-        // We still return success for the upload, but log the email error
+        const stmt = db.prepare("INSERT INTO designs (userName, filename, originalName, size, createdAt) VALUES (?, ?, ?, ?, ?)");
+        stmt.run(userName, filename, originalname, size, createdAt);
+        console.log("Metadata stored in SQLite successfully");
+      } catch (dbError) {
+        console.error("SQLite Insertion Error:", dbError);
+        // We continue even if DB fails, as email is more important
       }
-    }
 
-    res.json({
-      message: "File uploaded successfully",
-      filename: filename,
-      originalName: originalname,
-      size: size,
-    });
+      // Send Email via Resend (API)
+      const resendClient = getResend();
+      if (resendClient) {
+        try {
+          await resendClient.emails.send({
+            from: "Vasen Design <onboarding@resend.dev>",
+            to: "sk.vrifle@gmail.com",
+            subject: `Neues Vasen-Design von ${userName}: ${originalname}`,
+            text: `Ein neues Vasen-Design wurde hochgeladen.\n\nAbsender: ${userName}\nDateiname: ${originalname}\nGröße: ${(size / 1024 / 1024).toFixed(2)} MB`,
+          });
+          console.log("Resend email sent");
+        } catch (resendError) {
+          console.error("Resend API Error:", resendError);
+        }
+      }
+
+      // Fallback: Send Email via Nodemailer (SMTP)
+      const transporter = getTransporter();
+      if (transporter) {
+        try {
+          await transporter.sendMail({
+            from: `"Design Upload" <${process.env.GMAIL_USER}>`,
+            to: "sk.vrifle@gmail.com",
+            subject: `Neues Vasen-Design von ${userName}: ${originalname}`,
+            text: `Ein neues Vasen-Design wurde hochgeladen.\n\nAbsender: ${userName}\nDateiname: ${originalname}\nGröße: ${(size / 1024 / 1024).toFixed(2)} MB`,
+            attachments: [{ filename: originalname, path: filePath }],
+          });
+          console.log("Nodemailer email sent");
+        } catch (error) {
+          console.error("Nodemailer Error:", error);
+        }
+      }
+
+      return res.json({
+        message: "File uploaded successfully",
+        filename: filename,
+        originalName: originalname,
+        size: size,
+      });
+    } catch (globalError) {
+      console.error("Global Upload Route Error:", globalError);
+      return res.status(500).json({ error: "Interner Serverfehler beim Upload" });
+    }
   });
 
   app.get("/api/files", (req, res) => {
