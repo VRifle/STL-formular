@@ -83,7 +83,9 @@ export default function App() {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || 'Upload fehlgeschlagen');
+        const msg = errorData.error || errorData.message || 'Upload fehlgeschlagen';
+        const details = errorData.details ? ` (${errorData.details})` : '';
+        throw new Error(`${msg}${details}`);
       }
 
       const result = await response.json();

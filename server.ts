@@ -19,8 +19,15 @@ const getResend = () => {
 };
 
 // Initialize SQLite database
-const db = new Database("designs.db");
-console.log("SQLite database initialized at designs.db");
+let db: Database.Database;
+try {
+  db = new Database("designs.db");
+  console.log("SQLite database initialized at designs.db");
+} catch (err) {
+  console.error("SQLite Init Error, falling back to memory:", err);
+  db = new Database(":memory:");
+}
+
 db.exec(`
   CREATE TABLE IF NOT EXISTS designs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -33,10 +40,14 @@ db.exec(`
 `);
 
 // Ensure uploads directory exists
-const uploadDir = path.join(process.cwd(), "uploads");
+const uploadDir = path.resolve("uploads");
 if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir);
-  console.log("Created uploads directory");
+  try {
+    fs.mkdirSync(uploadDir, { recursive: true });
+    console.log("Created uploads directory at", uploadDir);
+  } catch (err) {
+    console.error("Failed to create uploads directory:", err);
+  }
 }
 
 // Configure multer for storage
@@ -152,7 +163,10 @@ async function startServer() {
       });
     } catch (globalError) {
       console.error("Global Upload Route Error:", globalError);
-      return res.status(500).json({ error: "Interner Serverfehler beim Upload" });
+      return res.status(500).json({ 
+        error: globalError instanceof Error ? globalError.message : "Interner Serverfehler beim Upload",
+        details: String(globalError)
+      });
     }
   });
 
@@ -181,6 +195,16 @@ async function startServer() {
       res.sendFile(path.join(distPath, "index.html"));
     });
   }
+
+  // Global Error Handler
+  app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+    console.error("Express Global Error:", err);
+    res.status(500).json({ 
+      error: "Server-Fehler", 
+      message: err.message || String(err),
+      stack: process.env.NODE_ENV !== "production" ? err.stack : undefined
+    });
+  });
 
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on http://0.0.0.0:${PORT}`);
