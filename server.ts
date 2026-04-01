@@ -5,7 +5,6 @@ import path from "path";
 import fs from "fs";
 import cors from "cors";
 import nodemailer from "nodemailer";
-import Database from "better-sqlite3";
 import { Resend } from "resend";
 
 // Initialize Resend (API-based email, works on Cloudflare)
@@ -18,50 +17,12 @@ const getResend = () => {
   return new Resend(apiKey);
 };
 
-// Initialize SQLite database
-let db: Database.Database;
-try {
-  db = new Database("designs.db");
-  console.log("SQLite database initialized at designs.db");
-} catch (err) {
-  console.error("SQLite Init Error, falling back to memory:", err);
-  db = new Database(":memory:");
-}
-
-db.exec(`
-  CREATE TABLE IF NOT EXISTS designs (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    userName TEXT,
-    filename TEXT,
-    originalName TEXT,
-    size INTEGER,
-    createdAt TEXT
-  )
-`);
-
-// Ensure uploads directory exists
-const uploadDir = path.resolve("uploads");
-if (!fs.existsSync(uploadDir)) {
-  try {
-    fs.mkdirSync(uploadDir, { recursive: true });
-    console.log("Created uploads directory at", uploadDir);
-  } catch (err) {
-    console.error("Failed to create uploads directory:", err);
-  }
-}
-
-// Configure multer for storage
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, uploadDir);
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-    cb(null, uniqueSuffix + "-" + file.originalname);
-  },
+// Configure multer for memory storage (required for Cloudflare/Serverless)
+const storage = multer.memoryStorage();
+const upload = multer({ 
+  storage: storage,
+  limits: { fileSize: 50 * 1024 * 1024 } // 50MB Limit
 });
-
-const upload = multer({ storage: storage });
 
 // Email Transporter Configuration
 // Note: Use environment variables for security
@@ -89,15 +50,7 @@ async function startServer() {
 
   // API Routes
   app.get("/api/health", (req, res) => {
-    try {
-      const row = db.prepare("SELECT 1 as ok").get();
-      const testFile = path.join(uploadDir, ".test-write");
-      fs.writeFileSync(testFile, "ok");
-      fs.unlinkSync(testFile);
-      res.json({ status: "ok", db: row ? "connected" : "error", fs: "writable" });
-    } catch (err) {
-      res.status(500).json({ status: "error", message: err instanceof Error ? err.message : String(err) });
-    }
+    res.json({ status: "ok", mode: "serverless", storage: "memory" });
   });
 
   app.post("/api/upload", upload.single("file"), async (req, res) => {
@@ -107,20 +60,9 @@ async function startServer() {
         return res.status(400).json({ error: "No file uploaded" });
       }
 
-      const { filename, originalname, path: filePath, size } = req.file;
+      const { originalname, size, buffer } = req.file;
       const userName = req.body.userName || "Unbekannter Nutzer";
-      const createdAt = new Date().toISOString();
-      console.log(`Processing upload: ${originalname} from ${userName}`);
-
-      // Store metadata in SQLite
-      try {
-        const stmt = db.prepare("INSERT INTO designs (userName, filename, originalName, size, createdAt) VALUES (?, ?, ?, ?, ?)");
-        stmt.run(userName, filename, originalname, size, createdAt);
-        console.log("Metadata stored in SQLite successfully");
-      } catch (dbError) {
-        console.error("SQLite Insertion Error:", dbError);
-        // We continue even if DB fails, as email is more important
-      }
+      console.log(`Processing memory upload: ${originalname} from ${userName}`);
 
       // Send Email via Resend (API)
       const resendClient = getResend();
@@ -131,8 +73,14 @@ async function startServer() {
             to: "sk.vrifle@gmail.com",
             subject: `Neues Vasen-Design von ${userName}: ${originalname}`,
             text: `Ein neues Vasen-Design wurde hochgeladen.\n\nAbsender: ${userName}\nDateiname: ${originalname}\nGröße: ${(size / 1024 / 1024).toFixed(2)} MB`,
+            attachments: [
+              {
+                filename: originalname,
+                content: buffer,
+              }
+            ]
           });
-          console.log("Resend email sent");
+          console.log("Resend email sent with attachment");
         } catch (resendError) {
           console.error("Resend API Error:", resendError);
         }
@@ -147,17 +95,16 @@ async function startServer() {
             to: "sk.vrifle@gmail.com",
             subject: `Neues Vasen-Design von ${userName}: ${originalname}`,
             text: `Ein neues Vasen-Design wurde hochgeladen.\n\nAbsender: ${userName}\nDateiname: ${originalname}\nGröße: ${(size / 1024 / 1024).toFixed(2)} MB`,
-            attachments: [{ filename: originalname, path: filePath }],
+            attachments: [{ filename: originalname, content: buffer }],
           });
-          console.log("Nodemailer email sent");
+          console.log("Nodemailer email sent with attachment");
         } catch (error) {
           console.error("Nodemailer Error:", error);
         }
       }
 
       return res.json({
-        message: "File uploaded successfully",
-        filename: filename,
+        message: "File uploaded and sent successfully",
         originalName: originalname,
         size: size,
       });
@@ -171,14 +118,8 @@ async function startServer() {
   });
 
   app.get("/api/files", (req, res) => {
-    try {
-      const stmt = db.prepare("SELECT * FROM designs ORDER BY id DESC");
-      const designs = stmt.all();
-      res.json(designs);
-    } catch (dbError) {
-      console.error("Failed to fetch designs from SQLite:", dbError);
-      res.status(500).json({ error: "Unable to fetch designs" });
-    }
+    // SQLite is removed, so we return an empty list or a message
+    res.json([]);
   });
 
   // Vite middleware for development
